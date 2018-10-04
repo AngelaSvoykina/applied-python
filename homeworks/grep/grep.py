@@ -1,4 +1,3 @@
-
 import argparse
 import sys
 
@@ -9,15 +8,27 @@ def output(line):
 
 def grep(lines, params):
     for line in lines:
-        line = line.rstrip()
-        if params.pattern in line:
-            output(line)
-
+        pattern_buf = params.pattern
+        line_buf = line.rstrip()
+        
+        if params.ignore_case == True:
+            pattern_buf = pattern_buf.lower()
+            line_buf = line_buf.lower()
+        if params.invert == True:
+            if pattern_buf not in line_buf:
+                output(line)
+        else:
+            if pattern_buf in line_buf:
+                output(line)
 
 def parse_args(args):
     parser = argparse.ArgumentParser(description='This is a simple grep on python')
     parser.add_argument(
-        '-v', action="store_true", dest="invert", default=False, help='Selected lines are those not matching pattern.')
+        '-v',
+         action="store_true",
+          dest="invert", 
+          default=False, 
+          help='Selected lines are those not matching pattern.')
     parser.add_argument(
         '-i', action="store_true", dest="ignore_case", default=False, help='Perform case insensitive matching.')
     parser.add_argument(
