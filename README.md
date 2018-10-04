@@ -21,3 +21,17 @@
 > pip install notebook
 
 > jupyter-notebook
+
+* Запуск тестов в домашке
+
+> python -m unittest -v tests.test_grep
+
+* Работа с гитом
+
+> git add .
+
+Закоммитить изменения 
+> git commit -m "Add invert and ignore_case"
+
+Отправить коммиты в репозиторий на сайте
+> git push
