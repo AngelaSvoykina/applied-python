@@ -1,5 +1,6 @@
 import argparse
 import sys
+import re
 
 
 def output(line):
@@ -7,19 +8,59 @@ def output(line):
 
 
 def grep(lines, params):
-    for line in lines:
+    outLines = []
+
+    for i, line in enumerate(lines):
         pattern_buf = params.pattern
         line_buf = line.rstrip()
+
         
         if params.ignore_case == True:
             pattern_buf = pattern_buf.lower()
             line_buf = line_buf.lower()
-        if params.invert == True:
-            if pattern_buf not in line_buf:
-                output(line)
-        else:
-            if pattern_buf in line_buf:
-                output(line)
+
+        # a.sd*asd? -> a\.sd.*asd.
+        pattern_buf = pattern_buf.replace('.', '\.')
+        pattern_buf = pattern_buf.replace('?','.')
+        pattern_buf = pattern_buf.replace('*', '.*')
+        if re.search(pattern_buf, line_buf):
+            outLines.append(i)
+
+    
+    N = params.context
+    B = N
+    A = N
+
+    if params.before_context > 0:
+        B = params.before_context
+    if params.after_context > 0:
+        A = params.after_context
+    temp = []                
+    for i in outLines:
+        for j in range(i - B, i + A + 1):
+            if j >= 0 and j < len(lines) and (len(temp) == 0 or j > temp[-1]):
+                temp.append(j)
+
+    originLines = outLines
+    outLines = temp
+
+    if params.invert == True:
+        outLines = [i for i in range(0, len(lines)) if i not in outLines]
+
+    if params.count == True:
+        output(str(len(outLines)))
+    else:
+        for i in outLines:
+            if params.line_number == True:
+                if i in originLines:
+                    output(str(i+1)+':'+lines[i])
+                else:
+                    output(str(i+1)+'-'+lines[i])
+            else:
+                output(lines[i])
+
+
+
 
 def parse_args(args):
     parser = argparse.ArgumentParser(description='This is a simple grep on python')

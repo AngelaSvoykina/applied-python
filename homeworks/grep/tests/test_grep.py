@@ -18,7 +18,7 @@ class GrepBaseTest(TestCase):
 
     def tearDown(self):
         global lst
-        lst.clear()
+        lst[:] = []
 
     def test_base_scenario(self):
         params = grep.parse_args(['aa'])
@@ -51,7 +51,7 @@ class GrepPatternTest(TestCase):
 
     def tearDown(self):
         global lst
-        lst.clear()
+        lst[:] = []
 
     def test_question_base(self):
         params = grep.parse_args(['?b'])
@@ -94,7 +94,7 @@ class GrepContextTest(TestCase):
 
     def tearDown(self):
         global lst
-        lst.clear()
+        lst[:] = []
 
     def test_context_base(self):
         params = grep.parse_args(['-C1','aa'])
@@ -127,7 +127,7 @@ class GrepLineNumbersTest(TestCase):
 
     def tearDown(self):
         global lst
-        lst.clear()
+        lst[:] = []
 
     def test_numbers_base(self):
         params = grep.parse_args(['-n','ab'])
