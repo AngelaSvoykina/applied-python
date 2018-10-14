@@ -1,5 +1,6 @@
 import argparse
 import sys
+from collections import deque
 import re
 
 
@@ -8,25 +9,6 @@ def output(line):
 
 
 def grep(lines, params):
-    outLines = []
-
-    for i, line in enumerate(lines):
-        pattern_buf = params.pattern
-        line_buf = line.rstrip()
-
-        
-        if params.ignore_case == True:
-            pattern_buf = pattern_buf.lower()
-            line_buf = line_buf.lower()
-
-        # a.sd*asd? -> a\.sd.*asd.
-        pattern_buf = pattern_buf.replace('.', '\.')
-        pattern_buf = pattern_buf.replace('?','.')
-        pattern_buf = pattern_buf.replace('*', '.*')
-        if re.search(pattern_buf, line_buf):
-            outLines.append(i)
-
-    
     N = params.context
     B = N
     A = N
@@ -35,41 +17,93 @@ def grep(lines, params):
         B = params.before_context
     if params.after_context > 0:
         A = params.after_context
-    temp = []                
-    for i in outLines:
-        for j in range(i - B, i + A + 1):
-            if j >= 0 and j < len(lines) and (len(temp) == 0 or j > temp[-1]):
-                temp.append(j)
 
-    originLines = outLines
-    outLines = temp
+    pattern_buf = params.pattern
 
-    if params.invert == True:
-        outLines = [i for i in range(0, len(lines)) if i not in outLines]
+    if params.ignore_case:
+        pattern_buf = pattern_buf.lower()
 
-    if params.count == True:
-        output(str(len(outLines)))
-    else:
-        for i in outLines:
-            if params.line_number == True:
-                if i in originLines:
-                    output(str(i+1)+':'+lines[i])
+    # a.sd*asd? -> a\.sd.*asd.
+    pattern_buf = pattern_buf.replace('.', '\.')
+    pattern_buf = pattern_buf.replace('?', '.')
+    pattern_buf = pattern_buf.replace('*', '.*')
+
+    pattern_buf = re.compile(pattern_buf)
+
+    # Deque размера B
+    out_lines = deque(maxlen=B)
+
+    num_lines = 0
+    print_until_line = 0
+    last_printed_line = -1
+
+    for i, line in enumerate(lines):
+
+        line_buf = line.rstrip()
+
+        if params.ignore_case:
+            line_buf = line_buf.lower()
+
+        is_match = pattern_buf.search(line_buf)
+
+        if params.invert:
+            is_match = not is_match
+
+        if is_match:
+            num_lines += 1
+
+            if not params.count:
+                if B != 0:
+                    if (i - last_printed_line - 1) == 0:
+                        deque_i = B
+                    elif (i - last_printed_line - 1) >= B:
+                        deque_i = 0
+                    else:
+                        deque_i = i - last_printed_line - 1
+
+                    # Ouput lines from deck correspondingly to already printed
+                    for k in range(deque_i, B):
+                        num_lines += 1
+
+                        if params.line_number:
+                            output(str(i - B + k + 1) + '-' + out_lines[k])
+                        else:
+                            output(out_lines[k])
+
+                if params.line_number:
+                    output(str(i + 1) + ':' + line)
                 else:
-                    output(str(i+1)+'-'+lines[i])
-            else:
-                output(lines[i])
+                    output(line)
 
+                # update printed lines
+                print_until_line = i + A + 1
+                last_printed_line = i
 
+        elif i < print_until_line:
+            num_lines += 1
+
+            if not params.count:
+                if params.line_number:
+                    output(str(i + 1) + '-' + line)
+                else:
+                    output(line)
+
+            last_printed_line = i
+
+        out_lines.append(line)
+
+    if params.count:
+        output(str(num_lines))
 
 
 def parse_args(args):
     parser = argparse.ArgumentParser(description='This is a simple grep on python')
     parser.add_argument(
         '-v',
-         action="store_true",
-          dest="invert", 
-          default=False, 
-          help='Selected lines are those not matching pattern.')
+        action="store_true",
+        dest="invert",
+        default=False,
+        help='Selected lines are those not matching pattern.')
     parser.add_argument(
         '-i', action="store_true", dest="ignore_case", default=False, help='Perform case insensitive matching.')
     parser.add_argument(
