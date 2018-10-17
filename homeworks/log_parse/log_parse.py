@@ -62,13 +62,14 @@ def parse(
         # TODO: Всегда добавлять в tuple
         if request_type is not None:
             if match.group(2) == request_type:
-                urls_data.append(match.group(5))
+                urls_data.insert(match.group(5))
         else:
-            urls_data.append(match.group(5))
+            urls_data.insert(match.group(5))
 
         # TODO: Во второй (1-й) элемент tuple записывать
         if slow_queries:
-            urls_data.append(int(match.group(8)))
+            if urls_data[1]:
+                urls_data.append(int(match.group(8)))
 
     # if len(ignore_urls) > 0:
     #     urls_data = list(filter(lambda x: x not in ignore_urls, urls_data))
@@ -76,9 +77,9 @@ def parse(
     if slow_queries:
         slow_cnt = Counter(urls_data)
 
-        print(sorted(urls_data))
+        #print(sorted(urls_data))
 
-        result = math.floor(numpy.mean(slow_cnt.most_common()[:-5:-1]))
+        #result = math.floor(numpy.mean(slow_cnt.most_common()[:-5:-1]))
     else:
         urls_cnt = Counter(urls_data)
 
