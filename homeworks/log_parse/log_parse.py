@@ -25,6 +25,8 @@ def parse(
 
     result = []
 
+    extreg = re.compile(r".*\.([a-zA-Z0-9]*)$")
+
     if not ignore_www:
         reg = r"^\[(.*)] \"([\S]*) ()()([\S]*) ([\S]*)\" ([\S]*) ([\S]*)"
     else:
@@ -53,6 +55,9 @@ def parse(
         if len(ignore_urls) > 0:
             if match.group(5) in ignore_urls:
                 continue
+
+        if ignore_files and re.match(extreg, match.group(5)):
+            continue
 
         # TODO: Всегда добавлять в tuple
         if request_type is not None:
