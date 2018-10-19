@@ -37,17 +37,16 @@ def parse(
         if not match:
             continue
 
-        if start_at is not None:
+        if start_at is not None or stop_at is not None:
             url_date = datetime.datetime.strptime(match.group(1), '%d/%b/%Y %H:%M:%S')
 
+        if start_at is not None:
             if start_at > url_date:
                 continue
             else:
                 start_at = None
 
         if stop_at is not None:
-            url_date = datetime.datetime.strptime(match.group(1), '%d/%b/%Y %H:%M:%S')
-
             if stop_at < url_date:
                 break
 
