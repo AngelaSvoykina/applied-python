@@ -2,7 +2,7 @@
 import re
 import math
 import datetime
-from collections import Counter
+from collections import defaultdict
 
 
 def parse(
@@ -14,7 +14,8 @@ def parse(
         ignore_www=False,
         slow_queries=False
 ):
-    urls_data = []
+    urls_data = defaultdict(int)
+    urls_time = defaultdict(int)
 
     result = []
 
@@ -34,15 +35,15 @@ def parse(
         if start_at is not None or stop_at is not None:
             url_date = datetime.datetime.strptime(match.group(1), '%d/%b/%Y %H:%M:%S')
 
-        if start_at is not None:
-            if start_at > url_date:
-                continue
-            else:
-                start_at = None
+            if start_at is not None:
+                if start_at > url_date:
+                    continue
+                else:
+                    start_at = None
 
-        if stop_at is not None:
-            if stop_at < url_date:
-                break
+            if stop_at is not None:
+                if stop_at < url_date:
+                    break
 
         if len(ignore_urls) > 0 and match.group(5) in ignore_urls:
             continue
@@ -50,28 +51,24 @@ def parse(
         if ignore_files and re.match(extreg, match.group(5)):
             continue
 
-        if request_type is not None and match.group(2) == request_type:
-            urls_data.append([match.group(5)])
+        if request_type is not None:
+          if match.group(2) == request_type:
+            urls_data[match.group(5)] += 1
         else:
-            urls_data.append([match.group(5)])
+            urls_data[match.group(5)] += 1
 
         if slow_queries:
-            urls_data[-1].append(int(match.group(8)))
+            urls_time[match.group(5)] += int(match.group(8))
+
 
     if slow_queries:
-        slowest = sorted(urls_data, key=lambda x: x[1], reverse=True)[:5] #топ 5 самых медленных
-        slowest = [[slow_el[0], sum(el[1] for el in urls_data if el[0] == slow_el[0])] for slow_el in slowest]
-        urls_cnt = Counter(el[0] for el in urls_data)
 
-        slowest = [math.floor(el[1]/urls_cnt[el[0]]) for el in slowest]
-        result = sorted(slowest, reverse=True)
+        slowest = sorted(urls_data, key=lambda url: urls_time[url] / urls_data[url], reverse=True)[:5]
+        result = [math.floor(urls_time[x] / urls_data[x]) for x in slowest]
     else:
-        urls_cnt = Counter(el[0] for el in urls_data)
-
-        urls_list = urls_cnt.most_common(5)
-        urls_list = [el[1] for el in urls_list]
-
-        result = urls_list
+        
+        top = sorted(urls_data, key=lambda url: urls_data[url], reverse=True)[:5]
+        result = [urls_data[x] for x in top]
 
     return result
 
