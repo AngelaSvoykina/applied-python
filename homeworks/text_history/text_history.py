@@ -1,4 +1,22 @@
 # -*- encoding: utf-8 -*-
+from functools import reduce
+
+
+def optimize(result, op):
+    prev = result[-1] if len(result) else None
+
+    if type(prev) is InsertAction and type(op) is InsertAction:
+        if prev.pos + len(prev.text) == op.pos:
+            newOp = InsertAction(prev.pos, prev.text + op.text, prev.from_version, op.to_version)
+            return result[:-1] + [newOp]
+
+    if type(prev) is DeleteAction and type(op) is InsertAction:
+        if prev.pos == op.pos and prev.length == len(op.text):
+            newOp = ReplaceAction(prev.pos, op.text, prev.from_version, op.to_version)
+            return result[:-1] + [newOp]
+
+    return result + [op]
+
 
 class TextHistory(object):
     def __init__(self):
@@ -61,8 +79,16 @@ class TextHistory(object):
         if to_version > self.history[-1].to_version:
             raise ValueError('to_version cannot be more than latest version: {}'.format(self.history[-1].to_version))
 
-        return list(filter(lambda action: action.from_version >= from_version and action.to_version <= to_version,
-                           self.history))
+        return list(
+            reduce(
+                optimize,
+                filter(
+                    lambda action: action.from_version >= from_version and action.to_version <= to_version,
+                    self.history
+                ),
+                []
+            )
+        )
 
 
 class Action(object):
@@ -125,7 +151,9 @@ h = TextHistory()
 h.insert('ENDddd')
 h.insert(' again bla')
 h.replace(text='ING', pos=3)
-res = h.get_actions(0, 0)
+h.delete(3, 0)
+h.insert('asd', 0)
+res = h.get_actions(0, 5)
 print(res)
 
 # ИСПРАВИТЬ
