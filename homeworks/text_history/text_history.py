@@ -155,11 +155,4 @@ h.delete(3, 0)
 h.insert('asd', 0)
 res = h.get_actions(0, 5)
 print(res)
-
-# ИСПРАВИТЬ
-# h.delete(length=-55, pos=3)
 print(h.text, h.version)
-
-# action = DeleteAction(pos=0, length=1, from_version=0, to_version=10)
-# print(h.action(action))
-# print(h.text)
