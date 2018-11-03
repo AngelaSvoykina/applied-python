@@ -92,7 +92,7 @@ class TaskQueueServer:
                     conn.send(res.encode())
                 else:
                     conn.send('ERROR'.encode())
-                conn.close()
+        conn.close()
 
 
 def parse_args():

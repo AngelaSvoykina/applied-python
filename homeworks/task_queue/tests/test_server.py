@@ -1,11 +1,10 @@
 from unittest import TestCase
+import unittest
 
 import time
 import socket
 
 import subprocess
-
-from server import run
 
 
 class ServerBaseTest(TestCase):
