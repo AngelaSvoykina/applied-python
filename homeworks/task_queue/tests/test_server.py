@@ -63,6 +63,29 @@ class ServerBaseTest(TestCase):
 
         os.remove("task_queue.dump")
 
+    def test_three_tasks(self):
+        first_task_id = self.send(b'ADD 1 5 12345')
+        second_task_id = self.send(b'ADD 1 5 12345')
+        three_task_id = self.send(b'ADD 2 5 12345')
+
+        self.assertEqual(b'YES', self.send(b'IN 1 ' + first_task_id))
+        self.assertEqual(b'YES', self.send(b'IN 1 ' + second_task_id))
+        self.assertEqual(b'YES', self.send(b'IN 2 ' + three_task_id))
+
+        self.assertEqual(first_task_id + b' 5 12345', self.send(b'GET 1'))
+        self.assertEqual(b'YES', self.send(b'IN 1 ' + first_task_id))
+        self.assertEqual(b'YES', self.send(b'IN 1 ' + second_task_id))
+        self.assertEqual(second_task_id + b' 5 12345', self.send(b'GET 1'))
+        self.assertEqual(three_task_id + b' 5 12345', self.send(b'GET 2'))
+
+        self.assertEqual(b'YES', self.send(b'ACK 1 ' + second_task_id))
+        self.assertEqual(b'NO', self.send(b'ACK 1 ' + second_task_id))
+
+        self.assertEqual(b'YES', self.send(b'ACK 2 ' + three_task_id))
+        self.assertEqual(b'NO', self.send(b'ACK 2 ' + three_task_id))
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
