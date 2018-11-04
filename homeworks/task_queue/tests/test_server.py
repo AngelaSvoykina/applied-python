@@ -38,6 +38,7 @@ class ServerBaseTest(TestCase):
     def test_two_tasks(self):
         first_task_id = self.send(b'ADD 1 5 12345')
         second_task_id = self.send(b'ADD 1 5 12345')
+
         self.assertEqual(b'YES', self.send(b'IN 1 ' + first_task_id))
         self.assertEqual(b'YES', self.send(b'IN 1 ' + second_task_id))
 
