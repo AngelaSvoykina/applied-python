@@ -7,9 +7,6 @@ import os
 import threading
 
 
-# TODO: Если задание взято на обработку и не отмечено как выполненное в течение 5 минут (еще один параметр запуска), оно должно вернуться в очередь
-# TODO: Правильно обрабатывать Ctr+C
-
 class TaskQueueServer:
     def __init__(self, ip='127.0.0.1', port=5555, path='', timeout=3):
         self.ip = ip
