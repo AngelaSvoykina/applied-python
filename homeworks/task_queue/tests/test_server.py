@@ -2,6 +2,7 @@ from unittest import TestCase
 import unittest
 
 import time
+import os
 import socket
 
 import subprocess
@@ -49,6 +50,18 @@ class ServerBaseTest(TestCase):
 
         self.assertEqual(b'YES', self.send(b'ACK 1 ' + second_task_id))
         self.assertEqual(b'NO', self.send(b'ACK 1 ' + second_task_id))
+
+    def test_save(self):
+        task_id = self.send(b'ADD 1 5 12345')
+
+        self.assertEqual(b'OK', self.send(b'SAVE'))
+
+        self.tearDown()
+        self.setUp()
+
+        self.assertEqual(b'YES', self.send(b'IN 1 ' + task_id))
+
+        os.remove("task_queue.dump")
 
 
 if __name__ == '__main__':

@@ -2,30 +2,34 @@
 import argparse
 import socket
 import pickle
-import uuid
 import time
 import os
+import threading
 
 
 # TODO: Если задание взято на обработку и не отмечено как выполненное в течение 5 минут (еще один параметр запуска), оно должно вернуться в очередь
-# TODO: Данные о заданиях должны записываться на диск.
-# Если сервер выключили (не только штатно, например, завершили процесс) - то после запуска он должен продолжить с тем же списком заданий в тех же состояниях что и до падения.
-
 # TODO: Правильно обрабатывать Ctr+C
 
 class TaskQueueServer:
-
-    def __init__(self, ip='127.0.0.1', port=5555, path='', timeout=300):
+    def __init__(self, ip='127.0.0.1', port=5555, path='', timeout=3):
         self.ip = ip
         self.port = port
         self.path = path
         self.timeout = timeout
         self.queues = []
+        self.timers = []
 
         self.load()
 
     def __uniqid(self):
         return hex(int(time.time() * 10000000))[2:]
+
+    def __task_timeout(self, queue, task):
+        print('TIMEOUT task {}'.format(task['id']))
+
+        queue['running_tasks'].remove(task)
+        queue['data'].insert(0, task)
+        self.timers = [t for t in self.timers if t['task_id'] != task['id']]
 
     def add(self, q_name, length, data):
         if length > 1000000:
@@ -39,6 +43,9 @@ class TaskQueueServer:
         id = self.__uniqid()
 
         q['data'].append({'id': id, 'length': length, 'data': data})
+
+        print('ADD task {} to {}'.format(id, q_name))
+
         return id
 
     def search_in_dict(self, source, key_name, value):
@@ -48,13 +55,21 @@ class TaskQueueServer:
         return None
 
     def get(self, q_name):
-        # TODO: удалить взятое задание из очереди, внести в список выполняющихся и следить за его timeout
         q = self.search_in_dict(self.queues, 'name', q_name)
         if q is None or len(q['data']) == 0:
             return 'NONE'
 
         task = q['data'].pop(0)
+
+        # task['start_time'] = time.time()
+        t = threading.Timer(float(self.timeout), self.__task_timeout, [q, task])
+        t.start()
+
+        self.timers.append({'timer': t, 'task_id': task['id']})
+
         q['running_tasks'].append(task)
+
+        print('GET task {} from {}'.format(task['id'], q_name))
 
         return ' '.join(str(i) for i in task.values())
 
@@ -68,6 +83,12 @@ class TaskQueueServer:
 
         if task is None:
             return 'NO'
+
+        timer = [t for t in self.timers if t['task_id'] == task_id][0]
+        timer['timer'].cancel()
+        self.timers = [t for t in self.timers if t['task_id'] != task_id]
+
+        print('ACK task {} from {}'.format(id, q_name))
 
         q['running_tasks'] = [task for task in q['running_tasks'] if task['id'] != task_id]
 
@@ -97,8 +118,11 @@ class TaskQueueServer:
         try:
             with open(os.path.join(self.path, 'task_queue.dump'), 'wb') as handle:
                 pickle.dump(self.__dict__, handle, protocol=pickle.HIGHEST_PROTOCOL)
-        except:
+        except Exception as e:
+            print(e)
             res = 'ERROR'
+
+        print('SAVED')
 
         return res
 
@@ -106,7 +130,7 @@ class TaskQueueServer:
         if not os.path.exists(os.path.join(self.path, 'task_queue.dump')):
             return 'ERROR Dump dile do not exist'
 
-        print('*** Loading from file: {}'.format(os.path.join(self.path, 'task_queue.dump')))
+        print('LOAD from file: {}'.format(os.path.join(self.path, 'task_queue.dump')))
 
         with open(os.path.join(self.path, 'task_queue.dump'), 'rb') as handle:
             data = pickle.load(handle)
@@ -121,7 +145,7 @@ class TaskQueueServer:
         while True:
             sock.listen(1)
             conn, addr = sock.accept()
-            # print('connected to client:', addr)
+            print('Connected to client:', addr)
 
             data = conn.recv(1000000).decode()
 
