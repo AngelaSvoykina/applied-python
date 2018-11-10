@@ -21,19 +21,11 @@ class TaskQueueServer:
         self.path = path
         self.timeout = timeout
         self.queues = {}
-        self.timers = []
 
         self.load()
 
     def __uniqid(self):
         return hex(int(time.time() * 10000000))[2:]
-
-    def __task_timeout(self, queue, task):
-        print('TIMEOUT task {}'.format(task['id']))
-
-        queue['running_tasks'].remove(task)
-        queue['data'].insert(0, task)
-        self.timers = [t for t in self.timers if t['task_id'] != task['id']]
 
     def add(self, q_name, length, data):
         if length > 1000000:
@@ -95,7 +87,6 @@ class TaskQueueServer:
         q.remove(task)
 
         print('ACK task {} from {}'.format(id, q_name))
-        print(self.queues)
 
         return 'YES'
 
@@ -122,11 +113,9 @@ class TaskQueueServer:
 
         res = 'OK'
 
-        data = {'queues': self.queues, 'timers': self.timers}
-
         try:
             with open(os.path.join(self.path, 'task_queue.dump'), 'wb') as handle:
-                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(self.queues, handle, protocol=pickle.HIGHEST_PROTOCOL)
         except Exception as e:
             print(e)
             res = 'ERROR'
@@ -144,8 +133,7 @@ class TaskQueueServer:
         with open(os.path.join(self.path, 'task_queue.dump'), 'rb') as handle:
             data = pickle.load(handle)
 
-        self.__dict__['queues'] = data['queues']
-        self.__dict__['timers'] = data['timers']
+        self.__dict__['queues'] = data
 
     def run(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
