@@ -7,13 +7,20 @@ import os
 import threading
 
 
+def search_in_dict(source, key_name, value):
+    for i in source:
+        if i[key_name] == value:
+            return i
+    return None
+
+
 class TaskQueueServer:
     def __init__(self, ip='127.0.0.1', port=5555, path='', timeout=3):
         self.ip = ip
         self.port = port
         self.path = path
         self.timeout = timeout
-        self.queues = []
+        self.queues = {}
         self.timers = []
 
         self.load()
@@ -32,75 +39,77 @@ class TaskQueueServer:
         if length > 1000000:
             raise ValueError()
 
-        q = self.search_in_dict(self.queues, 'name', q_name)
-        if q is None:
-            self.queues.append({'name': q_name, 'data': [], 'running_tasks': []})
-            q = self.queues[-1]
+        try:
+            q = self.queues[q_name]
+        except KeyError:
+            self.queues[q_name] = []
+            q = self.queues[q_name]
 
         id = self.__uniqid()
 
-        q['data'].append({'id': id, 'length': length, 'data': data})
+        q.append({'id': id, 'length': length, 'data': data, 'start_time': None})
 
         print('ADD task {} to {}'.format(id, q_name))
 
         return id
 
-    def search_in_dict(self, source, key_name, value):
-        for i in source:
-            if i[key_name] == value:
-                return i
-        return None
-
     def get(self, q_name):
-        q = self.search_in_dict(self.queues, 'name', q_name)
-        if q is None or len(q['data']) == 0:
+
+        try:
+            q = self.queues[q_name]
+        except KeyError:
             return 'NONE'
 
-        task = q['data'].pop(0)
+        if len(q) == 0:
+            return 'NONE'
 
-        # task['start_time'] = time.time()
-        t = threading.Timer(float(self.timeout), self.__task_timeout, [q, task])
-        t.start()
-
-        self.timers.append({'timer': t, 'task_id': task['id']})
-
-        q['running_tasks'].append(task)
-
-        print('GET task {} from {}'.format(task['id'], q_name))
-
-        return ' '.join(str(i) for i in task.values())
-
-    def ack(self, q_name, task_id):
-        q = self.search_in_dict(self.queues, 'name', q_name)
-
-        if q is None or (len(q['data']) == 0 and len(q['running_tasks']) == 0):
-            return 'NO'
-
-        task = self.search_in_dict(q['running_tasks'], 'id', task_id)
+        task = None
+        for t in q:
+            if t['start_time'] is None or time.time() - t['start_time'] > self.timeout:
+                task = t
+                break
 
         if task is None:
+            return 'NONE'
+
+        task['start_time'] = time.time()
+        print('GET task {} from {}'.format(task['id'], q_name))
+
+        return ' '.join(str(i) for i in [task['id'], task['length'], task['data']])
+
+    def ack(self, q_name, task_id):
+
+        try:
+            q = self.queues[q_name]
+        except KeyError:
             return 'NO'
 
-        timer = [t for t in self.timers if t['task_id'] == task_id][0]
-        timer['timer'].cancel()
-        self.timers = [t for t in self.timers if t['task_id'] != task_id]
+        if len(q) == 0:
+            return 'NO'
+
+        task = search_in_dict(q, 'id', task_id)
+
+        if task is None or time.time() - task['start_time'] > self.timeout:
+            return 'NO'
+
+        q.remove(task)
 
         print('ACK task {} from {}'.format(id, q_name))
-
-        q['running_tasks'] = [task for task in q['running_tasks'] if task['id'] != task_id]
+        print(self.queues)
 
         return 'YES'
 
     def in_command(self, q_name, task_id):
-        q = self.search_in_dict(self.queues, 'name', q_name)
 
-        if q is None or (len(q['data']) == 0 and len(q['running_tasks']) == 0):
+        try:
+            q = self.queues[q_name]
+        except KeyError:
             return 'NO'
 
-        task = self.search_in_dict(q['data'], 'id', task_id)
+        if len(q) == 0:
+            return 'NO'
 
-        if task is None:
-            task = self.search_in_dict(q['running_tasks'], 'id', task_id)
+        task = search_in_dict(q, 'id', task_id)
 
         if task is None:
             return 'NO'
@@ -112,9 +121,12 @@ class TaskQueueServer:
             return 'ERROR Path do not exist'
 
         res = 'OK'
+
+        data = {'queues': self.queues, 'timers': self.timers}
+
         try:
             with open(os.path.join(self.path, 'task_queue.dump'), 'wb') as handle:
-                pickle.dump(self.__dict__, handle, protocol=pickle.HIGHEST_PROTOCOL)
+                pickle.dump(data, handle, protocol=pickle.HIGHEST_PROTOCOL)
         except Exception as e:
             print(e)
             res = 'ERROR'
@@ -125,14 +137,15 @@ class TaskQueueServer:
 
     def load(self):
         if not os.path.exists(os.path.join(self.path, 'task_queue.dump')):
-            return 'ERROR Dump dile do not exist'
+            return 'ERROR Dump file does not exist'
 
         print('LOAD from file: {}'.format(os.path.join(self.path, 'task_queue.dump')))
 
         with open(os.path.join(self.path, 'task_queue.dump'), 'rb') as handle:
             data = pickle.load(handle)
 
-        self.__dict__ = data
+        self.__dict__['queues'] = data['queues']
+        self.__dict__['timers'] = data['timers']
 
     def run(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
