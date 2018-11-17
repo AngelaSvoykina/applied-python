@@ -1,11 +1,11 @@
-from collections.abc import Mapping
+from collections.abc import MutableMapping
 import os
 
 
-class Dirdict(Mapping):
+class Dirdict(MutableMapping):
     def __init__(self, path):
         if not os.path.isdir(path):
-            raise TypeError('Path doesn\'t exist!')
+            raise TypeError("Path doesn't exist!")
 
         self.path = path
 
@@ -31,10 +31,11 @@ class Dirdict(Mapping):
     def __len__(self):
         return len([name for name in os.listdir(self.path) if os.path.isfile(os.path.join(self.path, name))])
 
+    def __delitem__(self):
+        pass
 
 d = Dirdict('./test')
 d['lang'] = 'Python\n'
 d['lang'] += 'C++\n'
 
 d['langs'] = ['c', 'c++']
-
