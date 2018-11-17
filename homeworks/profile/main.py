@@ -1,5 +1,5 @@
 from time import time
-import collections
+import collections.abc
 import inspect
 import types
 
@@ -38,7 +38,7 @@ def profile(foo, class_name=None):
             else:
                 return x
             x = self.oInstance.__getattribute__(s)
-            if isinstance(x, collections.Callable):
+            if isinstance(x, collections.abc.Callable):
                 return profile(x, foo.__name__)
             else:
                 return x
@@ -68,3 +68,4 @@ if __name__ == '__main__':
     func()
     s = Bar()
     s.bar()
+
