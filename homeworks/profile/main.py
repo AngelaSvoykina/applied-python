@@ -1,7 +1,5 @@
 from time import time
-import collections
 import inspect
-import types
 
 
 def profile(foo):
@@ -40,6 +38,7 @@ def profile(foo):
         return NewCls
     else:
         return profile_decorator
+
 
 @profile
 class Bar:
