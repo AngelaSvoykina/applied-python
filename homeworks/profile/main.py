@@ -41,7 +41,6 @@ def profile(foo):
     else:
         return profile_decorator
 
-
 @profile
 class Bar:
     def __init__(self, a=1):
