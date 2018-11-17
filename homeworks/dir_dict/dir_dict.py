@@ -31,8 +31,9 @@ class Dirdict(MutableMapping):
     def __len__(self):
         return len([name for name in os.listdir(self.path) if os.path.isfile(os.path.join(self.path, name))])
 
-    def __delitem__(self):
-        pass
+    def __delitem__(self, key):
+        os.remove(os.path.join(self.path, key))
+
 
 d = Dirdict('./test')
 d['lang'] = 'Python\n'
