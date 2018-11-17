@@ -6,18 +6,12 @@ import inspect
 def profile(foo, class_name=None):
     def wrapper(*args, **kwargs):
         t_before = time()
-        if class_name:
-            print('`{}.{}` started '.format(class_name, foo.__name__))
-        else:
-            print('`{}` started '.format(foo.__name__))
+        prefix = f'{class_name}.' if class_name else ''
+        print('`{}{}` started '.format(prefix, foo.__name__))
         res = foo(*args, **kwargs)
         t_after = time()
         d_t = t_after - t_before
-
-        if class_name:
-            print('`{}.{}` finished in {}'.format(class_name, foo.__name__, str(d_t)))
-        else:
-            print('`{}` finished in {}'.format(foo.__name__, str(d_t)))
+        print('`{}{}` finished in {} '.format(prefix, foo.__name__, str(d_t)))
         return res
 
     if inspect.isclass(foo):
