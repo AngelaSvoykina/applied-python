@@ -1,0 +1,53 @@
+from time import time
+import collections
+import inspect
+import types
+
+
+def profile(foo):
+    def profile_decorator(*args, **kwargs):
+        if inspect.isclass(foo):
+            for attr in foo.__dict__:
+                if isinstance(getattr(foo, attr), collections.Callable):
+                    setattr(foo, attr, profile(getattr(foo, attr)))
+                    print(getattr(foo, attr))
+            return foo
+            # for fn in inspect.getmembers(foo):
+            #     print(fn, callable(getattr(foo, fn.__name__)))
+            #
+            #     if isinstance(fn, types.FunctionType):
+            #         setattr(foo, fn.__name__, profile(fn))
+            #         print('sss')
+        else:
+            t_before = time()
+            print('`{}` started '.format(foo.__name__))
+            res = foo(*args, **kwargs)
+            t_after = time()
+            d_t = t_after - t_before
+            print('`{}` finished in {}'.format(foo.__name__, str(d_t)))
+            return res
+
+    return profile_decorator
+
+
+@profile
+class Something:
+    def __init__(self, a=1):
+        self.a = 1
+        pass
+
+    def foo(self):
+        print(self.a)
+        pass
+
+
+@profile
+def spam():
+    pass
+
+
+
+if __name__ == '__main__':
+    spam()
+    s = Something()
+    s.foo()
