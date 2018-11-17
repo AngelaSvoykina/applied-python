@@ -5,6 +5,12 @@ import types
 
 
 def profile(foo, class_name=None):
+    def class_wrapper():
+        for attr in foo.__dict__:
+            if isinstance(getattr(foo, attr), collections.Callable):
+                setattr(foo, attr, profile(getattr(foo, attr), foo.__name__))
+        return foo
+
     def wrapper(*args, **kwargs):
         t_before = time()
         if class_name:
@@ -21,30 +27,8 @@ def profile(foo, class_name=None):
             print('`{}` finished in {}'.format(foo.__name__, str(d_t)))
         return res
 
-    class NewCls(object):
-        def __init__(self, *args, **kwargs):
-            t_before = time()
-            print('`{}.__init__ started` '.format(foo.__name__))
-            self.oInstance = foo(*args, **kwargs)
-            t_after = time()
-            d_t = t_after - t_before
-            print('`{}.__init__ finished in {}`'.format(foo.__name__, str(d_t)))
-
-        def __getattribute__(self, s):
-            try:
-                x = super(NewCls, self).__getattribute__(s)
-            except AttributeError:
-                pass
-            else:
-                return x
-            x = self.oInstance.__getattribute__(s)
-            if isinstance(x, collections.abc.Callable):
-                return profile(x, foo.__name__)
-            else:
-                return x
-
     if inspect.isclass(foo):
-        return NewCls
+        return class_wrapper
     else:
         return wrapper
 
@@ -68,4 +52,3 @@ if __name__ == '__main__':
     func()
     s = Bar()
     s.bar()
-
