@@ -48,9 +48,6 @@ class Bar:
         self.a = 1
         pass
 
-    def example(self):
-        pass
-
 
 @profile
 def foo():
@@ -60,4 +57,3 @@ def foo():
 if __name__ == '__main__':
     foo()
     s = Bar()
-    s.example()
