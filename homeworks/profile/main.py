@@ -1,15 +1,24 @@
 from time import time
+import collections
 import inspect
+import types
 
 
-def profile(foo):
-    def profile_decorator(*args, **kwargs):
+def profile(foo, class_name=None):
+    def wrapper(*args, **kwargs):
         t_before = time()
-        print('`{}` started '.format(foo.__name__))
+        if class_name:
+            print('`{}.{}` started '.format(class_name, foo.__name__))
+        else:
+            print('`{}` started '.format(foo.__name__))
         res = foo(*args, **kwargs)
         t_after = time()
         d_t = t_after - t_before
-        print('`{}` finished in {}'.format(foo.__name__, str(d_t)))
+
+        if class_name:
+            print('`{}.{}` finished in {}'.format(class_name, foo.__name__, str(d_t)))
+        else:
+            print('`{}` finished in {}'.format(foo.__name__, str(d_t)))
         return res
 
     class NewCls(object):
@@ -29,15 +38,15 @@ def profile(foo):
             else:
                 return x
             x = self.oInstance.__getattribute__(s)
-            if type(x) == type(self.__init__):  # it is an instance method
-                return profile(x)  # this is equivalent of just decorating the method with profile
+            if isinstance(x, collections.Callable):
+                return profile(x, foo.__name__)
             else:
                 return x
 
     if inspect.isclass(foo):
         return NewCls
     else:
-        return profile_decorator
+        return wrapper
 
 
 @profile
@@ -46,12 +55,16 @@ class Bar:
         self.a = 1
         pass
 
+    def bar(self):
+        pass
+
 
 @profile
-def foo():
+def func():
     pass
 
 
 if __name__ == '__main__':
-    foo()
+    func()
     s = Bar()
+    s.bar()
