@@ -1,16 +1,9 @@
 from time import time
 import collections.abc
 import inspect
-import types
 
 
 def profile(foo, class_name=None):
-    def class_wrapper():
-        for attr in foo.__dict__:
-            if isinstance(getattr(foo, attr), collections.Callable):
-                setattr(foo, attr, profile(getattr(foo, attr), foo.__name__))
-        return foo
-
     def wrapper(*args, **kwargs):
         t_before = time()
         if class_name:
@@ -28,7 +21,10 @@ def profile(foo, class_name=None):
         return res
 
     if inspect.isclass(foo):
-        return class_wrapper
+        for attr in foo.__dict__:
+            if isinstance(getattr(foo, attr), collections.Callable):
+                setattr(foo, attr, profile(getattr(foo, attr), foo.__name__))
+        return foo
     else:
         return wrapper
 
