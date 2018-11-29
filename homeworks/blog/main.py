@@ -194,8 +194,15 @@ def delete_post(self, post_id):
 
     delete_post_sql = "DELETE FROM posts WHERE id = {}".\
         format(post_id)
-    
-    pass
+
+    with self.connection.cursor() as cursor:
+        # Выполнение sql-запроса
+        cursor.execute(delete_post_sql)
+        # записываем изменения
+    self.connection.commit()
+    # возвращается сообщение, что все ок
+    return {"message": "OK"}
+
 
 
 def create_comment(self, author_id, text, post_id=None, comment_id=None):
