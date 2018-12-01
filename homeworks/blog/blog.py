@@ -1,5 +1,6 @@
 import pymysql.cursors
 import hashlib
+import time
 from datetime import datetime
 
 
@@ -12,6 +13,9 @@ class Blog(object):
     def connect(self, login="tp_user", password="tp_password", db_name="sys_base", host='localhost'):
         self.connection = pymysql.connect(host=host, user=login, password=password, db=db_name, charset='utf8mb4',
                                           cursorclass=pymysql.cursors.DictCursor)
+
+    def disconnect(self):
+        self.connection.close()
 
     def create_user(self, username, first_name, last_name, password):
         check_username_sql = "SELECT id FROM users WHERE username = '{}';".format(username)
@@ -27,6 +31,15 @@ class Blog(object):
                 return {"error": "409", "message": "User already exists", "data": conflict_user}
 
             cursor.execute(create_user_sql)
+
+        self.connection.commit()
+        return {"message": "OK"}
+
+    def delete_user(self, username):
+        delete_sql = "DELETE FROM users WHERE username = '{}';".format(username)
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(delete_sql)
 
         self.connection.commit()
         return {"message": "OK"}
@@ -92,7 +105,7 @@ class Blog(object):
         """
         Получение всех пользователей
         """
-        get_users_sql = "SELECT username, f_name, l_name FROM users;"
+        get_users_sql = "SELECT id, username, f_name, l_name FROM users;"
 
         # Подсоединяемся к базе
         with self.connection.cursor() as cursor:
@@ -161,7 +174,7 @@ class Blog(object):
         получить список не удаленных блогов созданный авторизованным пользователем
         """
         if session is None:
-            get_sql = "SELECT * FROM blogs"
+            get_sql = "SELECT id, title FROM blogs"
         else:
             user = self.get_authorized_user(session)
 
@@ -211,15 +224,45 @@ class Blog(object):
         return {"message": "OK", "data": {"id": post_id, "created": created,
                                           "text": text, "title": title}}
 
-    def update_post(self, text=None, title=None, blogs=None):
+    def update_post(self, post_id, text=None, title=None, blogs=None):
         """
         Отредактировать пост, должна быть возможность изменить заголовки/текст/блоги в которых опубликован
         """
         if text is None and title is None and blogs is None:
-            raise ValueError('Please provide at least one argument')
+            return {"error": "404", "message": "Editable element not provided"}
 
-        update_post_sql = "UPDATE posts SET title = '{}', text = '{}'"
-        pass
+        with self.connection.cursor() as cursor:
+            if text is not None:
+                update_text_sql = "UPDATE posts SET text = '{}' WHERE post_id = {}".format(text, post_id)
+                cursor.execute(update_text_sql)
+
+            if title is not None:
+                update_title_sql = "UPDATE posts SET title = '{}' WHERE post_id = {}".format(title, post_id)
+                cursor.execute(update_title_sql)
+
+            if blogs is not None:
+                select_blogs_sql = "SELECT * from blog_posts WHERE post_id = {}".format(post_id)
+                cursor.execute(select_blogs_sql)
+
+                old_blogs = cursor.fetchall()
+                old_blogs = [x['blog_id'] for x in old_blogs]
+
+                # удаляем
+                old_blogs = [x for x in old_blogs if x not in blogs]
+                # добавляем
+                blogs = [x for x in blogs if x not in old_blogs]
+
+                delete_bp_sql = "DELETE FROM blog_posts WHERE post_id = {} AND blog_id = {}"
+                add_bp_sql = "INSERT INTO blog_posts (post_id, blog_id) VALUES ({}, {});"
+
+                for blog_id in old_blogs:
+                    cursor.execute(delete_bp_sql.format(post_id, blog_id))
+
+                for blog_id in blogs:
+                    cursor.execute(add_bp_sql.format(post_id, blog_id))
+
+        self.connection.commit()
+        return {"message": "OK", "data": {"id": post_id, "text": text, "title": title}}
 
     def delete_post(self, post_id):
         delete_post_sql = "DELETE FROM posts WHERE id = {}". \
@@ -231,22 +274,58 @@ class Blog(object):
         self.connection.commit()
         return {"message": "OK", "data": post_id}
 
-    def create_comment(self, author_id, text, post_id=None, comment_id=None):
+    def create_comment(self, session, text, created, post_id=None, comment_id=None):
         """
         добавить комментарий если пользователь авторизован
         комментарии должны реализовывать поддержку веток комментариев ( комментарий можно оставить на пост или на другой комментарий )
         """
-
         if post_id is None and comment_id is None:
-            return
+            return {"error": "404", "message": "Parent element not provided"}
 
-        pass
+        user = self.get_authorized_user(session)
+
+        if user is None:
+            self.connection.rollback()
+            return {"error": "404", "message": "User doesn't exist"}
+
+        select_comment_sql = "SELECT post_id FROM comments WHERE id = {}"
+        create_comment_sql = "INSERT INTO comments (text, created, author_id, comment_id, post_id) VALUES ('{}', '{}', {}, {}, {});"
+        select_last_id = "SELECT LAST_INSERT_ID();"
+
+        with self.connection.cursor() as cursor:
+            if comment_id is not None:
+                cursor.execute(select_comment_sql.format(comment_id))
+
+                if cursor.rowcount == 0:
+                    self.connection.rollback()
+                    return {"error": "404", "message": "Comment doesn't exist"}
+
+                post_id = cursor.fetchone()['post_id']
+            else:
+                comment_id = 'NULL'
+
+            cursor.execute(create_comment_sql.format(text, created, user['id'], comment_id, post_id))
+            cursor.execute(select_last_id)
+            insert_comment_id = cursor.fetchone()['LAST_INSERT_ID()']
+
+        self.connection.commit()
+        return {"message": "OK", "data": {"id": insert_comment_id, "created": created,
+                                          "text": text, "author_id": user['id'],
+                                          "post_id": post_id, "comment_id": comment_id}}
 
     def get_comments(self, author_id, post_id):
         """
         получить список всех комментариев пользователя к посту
         """
-        pass
+        select_comments_sql = "SELECT text, created FROM comments WHERE author_id = {} AND post_id = {} ORDER BY created".format(
+            author_id, post_id)
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(select_comments_sql)
+            comments = cursor.fetchall()
+
+        self.connection.commit()
+        return {"message": "OK", "data": comments}
 
 
 db = Blog()
@@ -275,3 +354,36 @@ db.connect()
 
 # res = db.get_blogs(session='578e9a838889f42d71f7ad705456da317f7ce2be')
 # print(res)
+
+# ts = time.time()
+# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+# res = db.create_post(1, timestamp, 'My first post', 'My first post', [1])
+# print(res)
+
+# ts = time.time()
+# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+# res = db.create_comment('578e9a838889f42d71f7ad705456da317f7ce2be', 'me first', timestamp, 1)
+# print(res)
+#
+# ts = time.time()
+# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+# res = db.create_comment('578e9a838889f42d71f7ad705456da317f7ce2be', 'no me', timestamp, None, 1)
+# print(res)
+
+# res = db.get_comments(1, 1)
+# print(res)
+
+# db.create_user('tp_username2', 'Angela', 'Svoykina', 'password')
+# res = db.authorize('tp_username2', 'password')
+# print(res)
+
+# ts = time.time()
+# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+# res = db.create_comment('c967668df612c92fbbdc57dfbbde2c819085ad46', 'no me!', timestamp, None, 2)
+# print(res)
+
+# res = db.create_blog(1, 'Second blog')
+# print(res)
+
+# res = db.update_post(1, None, None, [1,3])
+# print(res)s
