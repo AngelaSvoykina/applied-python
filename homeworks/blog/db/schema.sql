@@ -39,3 +39,4 @@ CREATE TABLE IF NOT EXISTS comments (
   post_id    INT          NOT NULL REFERENCES posts (id) ON DELETE SET NULL,
   author_id INT NOT NULL REFERENCES users (id)
 );
+
