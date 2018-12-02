@@ -24,3 +24,5 @@ def create_db(host='localhost', login='tp_user', password='tp_password', db_name
 
 if __name__ == '__main__':
     create_db()
+    create_db(path_to_schema='./db/indexes.sql')
+
