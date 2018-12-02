@@ -1,14 +1,26 @@
 import pymysql.cursors
 import hashlib
-import time
 from datetime import datetime
 
 
 class Blog(object):
     def __init__(self):
         self.connection = None
-        self.session = None
-        pass
+
+    def __get_authorized_user(self, session):
+        get_auto_user_sql = "SELECT * FROM sess WHERE sess = '{}'". \
+            format(session)
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(get_auto_user_sql)
+            user = cursor.fetchone()
+
+            if cursor.rowcount == 0:
+                self.connection.rollback()
+                return None
+
+            self.connection.commit()
+            return user
 
     def connect(self, login="tp_user", password="tp_password", db_name="sys_base", host='localhost'):
         self.connection = pymysql.connect(host=host, user=login, password=password, db=db_name, charset='utf8mb4',
@@ -18,9 +30,14 @@ class Blog(object):
         self.connection.close()
 
     def create_user(self, username, first_name, last_name, password):
+        """
+        Добавление пользователя
+        :return: возвращается id пользователя в качестве data
+        """
         check_username_sql = "SELECT id FROM users WHERE username = '{}';".format(username)
         create_user_sql = "INSERT INTO users (username, f_name, l_name, password) VALUES ('{}', '{}', '{}', SHA1('{}'))". \
             format(username, first_name, last_name, password)
+        select_last_id = "SELECT LAST_INSERT_ID();"
 
         with self.connection.cursor() as cursor:
             cursor.execute(check_username_sql)
@@ -31,22 +48,16 @@ class Blog(object):
                 return {"error": "409", "message": "User already exists", "data": conflict_user}
 
             cursor.execute(create_user_sql)
+            id = cursor.execute(select_last_id)
+            id = cursor.fetchone()['LAST_INSERT_ID()']
 
         self.connection.commit()
-        return {"message": "OK"}
-
-    def delete_user(self, username):
-        delete_sql = "DELETE FROM users WHERE username = '{}';".format(username)
-
-        with self.connection.cursor() as cursor:
-            cursor.execute(delete_sql)
-
-        self.connection.commit()
-        return {"message": "OK"}
+        return {"message": "OK", "data": id}
 
     def authorize(self, login, password):
         """
-        Авторизоваться пользователем по логину + паролю
+        Авторизация пользователя по логину + паролю
+        :return: строка сессии
         """
         sql = "SELECT * FROM users WHERE username='{}' AND password=SHA1('{}')". \
             format(login, password)
@@ -86,40 +97,24 @@ class Blog(object):
             self.connection.commit()
             return {"message": "OK", "sess": sess}
 
-    def get_authorized_user(self, session):
-        get_auto_user_sql = "SELECT * FROM sess WHERE sess = '{}'". \
-            format(session)
-
-        with self.connection.cursor() as cursor:
-            cursor.execute(get_auto_user_sql)
-            user = cursor.fetchone()
-
-            if cursor.rowcount == 0:
-                self.connection.rollback()
-                return None
-
-            self.connection.commit()
-            return user
-
     def get_users(self):
         """
         Получение всех пользователей
         """
         get_users_sql = "SELECT id, username, f_name, l_name FROM users;"
 
-        # Подсоединяемся к базе
         with self.connection.cursor() as cursor:
-            # Выполнение sql-запроса
             cursor.execute(get_users_sql)
-            # Получение объектов, возвращаемых запросом
             users = cursor.fetchall()
 
-        # записываем изменения
         self.connection.commit()
-        # возвращается сообщение, что все ок
         return {"message": "OK", "data": users}
 
     def create_blog(self, author_id, title):
+        """
+        Создать блог
+        :return: Данные созданного блога
+        """
         check_user_sql = "SELECT id FROM users WHERE id = {};".format(author_id)
 
         create_blog_sql = "INSERT INTO blogs (title, author_id) VALUES ('{}', {})". \
@@ -141,6 +136,9 @@ class Blog(object):
         return {"message": "OK", "data": {"id": blog_id, "title": title}}
 
     def update_blog(self, blog_id, title):
+        """
+        Редактировать блог
+        """
         update_sql = "UPDATE blogs SET title = '{}' WHERE id = {} ". \
             format(title, blog_id)
 
@@ -165,7 +163,7 @@ class Blog(object):
 
         self.connection.commit()
 
-        return {"message": "OK", "data": blog_id}
+        return {"message": "OK"}
 
     def get_blogs(self, session=None):
         """
@@ -176,11 +174,10 @@ class Blog(object):
         if session is None:
             get_sql = "SELECT id, title FROM blogs"
         else:
-            user = self.get_authorized_user(session)
-
+            user = self.__get_authorized_user(session)
             if user is not None:
-                get_sql = "SELECT * FROM blogs WHERE blogs.author_id = {}" \
-                    .format(user['id'])
+                get_sql = "SELECT id, title FROM blogs WHERE blogs.author_id = {}" \
+                    .format(user['user_id'])
             else:
                 self.connection.rollback()
                 return {"error": "404", "message": "User doesn't exist"}
@@ -195,8 +192,13 @@ class Blog(object):
     def create_post(self, author_id, created, text, title, blogs):
         """
         Создать пост связанный с одним или несколькими блогами
+        :param author_id: id автора
+        :param created: строка времени создания в формате '%Y-%m-%d %H:%M:%S'
+        :param text: содержание поста
+        :param title: заголовок поста
+        :param blogs: массив из id блогов
+        :return: данные поста, включая его id
         """
-
         check_user_sql = "SELECT id FROM users WHERE id = {};".format(author_id)
 
         create_post_sql = "INSERT INTO posts (title, text, created, author_id) VALUES ('{}', '{}', '{}', {});". \
@@ -226,18 +228,23 @@ class Blog(object):
 
     def update_post(self, post_id, text=None, title=None, blogs=None):
         """
-        Отредактировать пост, должна быть возможность изменить заголовки/текст/блоги в которых опубликован
+        Отредактировать пост, есть возможность изменить заголовки/текст/блоги в которых опубликован
+        :param post_id: id поста
+        :param text: если задан, меняется содержимое поста
+        :param title: если задан, меняется заголовок поста
+        :param blogs: массив из id блогов, если задан - меняются блоги, в которых опубликован пост
+        :return: обновленные данные поста
         """
         if text is None and title is None and blogs is None:
             return {"error": "404", "message": "Editable element not provided"}
 
         with self.connection.cursor() as cursor:
             if text is not None:
-                update_text_sql = "UPDATE posts SET text = '{}' WHERE post_id = {}".format(text, post_id)
+                update_text_sql = "UPDATE posts SET text = '{}' WHERE id = {}".format(text, post_id)
                 cursor.execute(update_text_sql)
 
             if title is not None:
-                update_title_sql = "UPDATE posts SET title = '{}' WHERE post_id = {}".format(title, post_id)
+                update_title_sql = "UPDATE posts SET title = '{}' WHERE id = {}".format(title, post_id)
                 cursor.execute(update_title_sql)
 
             if blogs is not None:
@@ -265,6 +272,9 @@ class Blog(object):
         return {"message": "OK", "data": {"id": post_id, "text": text, "title": title}}
 
     def delete_post(self, post_id):
+        """
+        Удалить пост по id
+        """
         delete_post_sql = "DELETE FROM posts WHERE id = {}". \
             format(post_id)
 
@@ -272,17 +282,24 @@ class Blog(object):
             cursor.execute(delete_post_sql)
 
         self.connection.commit()
-        return {"message": "OK", "data": post_id}
+        return {"message": "OK"}
 
     def create_comment(self, session, text, created, post_id=None, comment_id=None):
         """
-        добавить комментарий если пользователь авторизован
-        комментарии должны реализовывать поддержку веток комментариев ( комментарий можно оставить на пост или на другой комментарий )
+        Добавить комментарий если пользователь авторизован
+        Есть поддержка веток комментариев (комментарий можно оставить на пост или на другой комментарий)
+
+        :param session: сессия пользователя
+        :param text: содержимое комментария
+        :param created: строка времени создания в формате '%Y-%m-%d %H:%M:%S'
+        :param post_id: id поста, если комментарий к посту
+        :param comment_id: id комментария, если комментарий оставлен на другой комментарий
+        :return: данные созданного комментария, включая id
         """
         if post_id is None and comment_id is None:
             return {"error": "404", "message": "Parent element not provided"}
 
-        user = self.get_authorized_user(session)
+        user = self.__get_authorized_user(session)
 
         if user is None:
             self.connection.rollback()
@@ -304,7 +321,7 @@ class Blog(object):
             else:
                 comment_id = 'NULL'
 
-            cursor.execute(create_comment_sql.format(text, created, user['id'], comment_id, post_id))
+            cursor.execute(create_comment_sql.format(text, created, user['user_id'], comment_id, post_id))
             cursor.execute(select_last_id)
             insert_comment_id = cursor.fetchone()['LAST_INSERT_ID()']
 
@@ -315,9 +332,11 @@ class Blog(object):
 
     def get_comments(self, author_id, post_id):
         """
-        получить список всех комментариев пользователя к посту
+        Получить список всех комментариев пользователя к посту
+        :param author_id: id пользователя
+        :param post_id: id поста
         """
-        select_comments_sql = "SELECT text, created FROM comments WHERE author_id = {} AND post_id = {} ORDER BY created".format(
+        select_comments_sql = "SELECT text, created FROM comments WHERE author_id = {} AND post_id = {} ORDER BY id".format(
             author_id, post_id)
 
         with self.connection.cursor() as cursor:
@@ -327,63 +346,29 @@ class Blog(object):
         self.connection.commit()
         return {"message": "OK", "data": comments}
 
+    def get_users_comments(self, users_id, blog_id):
+        """
+        Получение всех комментариев для 1 или нескольких указанных пользователей из указанного блога
+        :param users_id: массив из id пользователей
+        :param blog_id: id блога
+        """
+        if len(users_id) == 0:
+            return {"error": "409", "message": "Users data incorrect"}
 
-db = Blog()
-db.connect()
-# db.create_user('tp_username', 'Angela', 'Svoykina', 'password')
-# res = db.authorize('tp_username', 'password')
-# print(res)
+        select_users_comments_sql = "SELECT c.text, c.created, c.author_id, c.post_id, c.comment_id FROM comments AS c" \
+                                    " JOIN posts  AS p ON c.post_id = p.id " \
+                                    "JOIN blog_posts AS b_p ON p.id = b_p.post_id " \
+                                    "WHERE blog_id = {} AND ({}) ORDER BY c.id"
 
-# res = db.get_users()
-# print(res)
+        users_condition = ''
+        for i, user in enumerate(users_id):
+            if i != 0:
+                users_condition += ' OR '
+            users_condition += 'c.author_id={}'.format(user)
 
-# res = db.create_blog(1, "Angelika blog")
-# print(res)
+        with self.connection.cursor() as cursor:
+            cursor.execute(select_users_comments_sql.format(blog_id, users_condition))
+            comments = cursor.fetchall()
 
-# res = db.update_blog(1, "Angelika super blog")
-# print(res)
-
-# res = db.create_blog(1, "Angelika trash two blog")
-# print(res)
-
-# res = db.delete_blog(res["data"]["id"])
-# print(res)
-
-# res = db.get_blogs()
-# print(res)
-
-# res = db.get_blogs(session='578e9a838889f42d71f7ad705456da317f7ce2be')
-# print(res)
-
-# ts = time.time()
-# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-# res = db.create_post(1, timestamp, 'My first post', 'My first post', [1])
-# print(res)
-
-# ts = time.time()
-# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-# res = db.create_comment('578e9a838889f42d71f7ad705456da317f7ce2be', 'me first', timestamp, 1)
-# print(res)
-#
-# ts = time.time()
-# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-# res = db.create_comment('578e9a838889f42d71f7ad705456da317f7ce2be', 'no me', timestamp, None, 1)
-# print(res)
-
-# res = db.get_comments(1, 1)
-# print(res)
-
-# db.create_user('tp_username2', 'Angela', 'Svoykina', 'password')
-# res = db.authorize('tp_username2', 'password')
-# print(res)
-
-# ts = time.time()
-# timestamp = datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-# res = db.create_comment('c967668df612c92fbbdc57dfbbde2c819085ad46', 'no me!', timestamp, None, 2)
-# print(res)
-
-# res = db.create_blog(1, 'Second blog')
-# print(res)
-
-# res = db.update_post(1, None, None, [1,3])
-# print(res)s
+        self.connection.commit()
+        return {"message": "OK", "data": comments}
