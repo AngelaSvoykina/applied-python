@@ -346,6 +346,34 @@ class Blog(object):
         self.connection.commit()
         return {"message": "OK", "data": comments}
 
+    def get_thread_comments(self, comment_id):
+        """
+        Получения ветки комментариев начиная с заданного
+        """
+        select_comment_sql = "SELECT * from comments WHERE id={}".format(comment_id)
+        # select_post_comments_sql = "SELECT * from comments WHERE blog_id={}"
+        select_child_comment_sql = "SELECT id, text, created, comment_id, post_id FROM comments WHERE post_id={} AND comment_id={}"
+
+        with self.connection.cursor() as cursor:
+            cursor.execute(select_comment_sql)
+            root_comment = cursor.fetchone()
+
+            comments = [{"id": root_comment['id'], "text": root_comment['text'],
+                         "created": root_comment['created'], "comment_id": root_comment['comment_id'],
+                         "post_id": root_comment['post_id']}]
+            parent_ids = [root_comment['id']]
+
+            while len(parent_ids) != 0:
+                parent_id = parent_ids[0]
+                cursor.execute(select_child_comment_sql.format(root_comment['post_id'], parent_id))
+                parent_ids.remove(parent_id)
+                childs = cursor.fetchall()
+                comments += childs
+                parent_ids += [x["id"] for x in childs]
+
+        self.connection.commit()
+        return {"message": "OK", "data": comments}
+
     def get_users_comments(self, users_id, blog_id):
         """
         Получение всех комментариев для 1 или нескольких указанных пользователей из указанного блога
@@ -372,3 +400,11 @@ class Blog(object):
 
         self.connection.commit()
         return {"message": "OK", "data": comments}
+
+
+if __name__ == '__main__':
+    db = Blog()
+    db.connect()
+    res = db.get_thread_comments(10413)
+    print(res)
+
