@@ -48,7 +48,7 @@ class Blog(object):
                 return {"error": "409", "message": "User already exists", "data": conflict_user}
 
             cursor.execute(create_user_sql)
-            id = cursor.execute(select_last_id)
+            cursor.execute(select_last_id)
             id = cursor.fetchone()['LAST_INSERT_ID()']
 
         self.connection.commit()
@@ -153,9 +153,6 @@ class Blog(object):
         Удалить блог
         """
         delete_sql = "DELETE FROM blogs WHERE id = {}". \
-            format(blog_id)
-
-        delete_blog_posts_sql = "DELETE FROM blogs WHERE id = {}". \
             format(blog_id)
 
         with self.connection.cursor() as cursor:
@@ -352,7 +349,8 @@ class Blog(object):
         """
         select_comment_sql = "SELECT * from comments WHERE id={}".format(comment_id)
         # select_post_comments_sql = "SELECT * from comments WHERE blog_id={}"
-        select_child_comment_sql = "SELECT id, text, created, comment_id, post_id FROM comments WHERE post_id={} AND comment_id={}"
+        select_child_comment_sql = "SELECT id, text, created, comment_id, post_id FROM comments " \
+                                   "WHERE post_id={} AND comment_id={}"
 
         with self.connection.cursor() as cursor:
             cursor.execute(select_comment_sql)
