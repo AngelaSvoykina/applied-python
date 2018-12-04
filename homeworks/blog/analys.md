@@ -1,7 +1,9 @@
 # Задание на оптимизацию запросов, разбор нескольких запросов с помощью explain
  
 ## Разбор запросов
+```sql
 EXPLAIN SELECT id FROM users WHERE username='ora994';
+```
            id: 1
   select_type: SIMPLE
         table: users
@@ -42,8 +44,9 @@ possible_keys: PRIMARY,id
 Здесь можно заметить, что индекс users_id_index не нужен, так как уже есть встроенный индекс по id. (я его и подобные убрала)
 
 Эти запросы оптимизированы с помощью индексов blogs_thread_id_index, blog_posts_id_index:
-
+```sql
 EXPLAIN SELECT id, title FROM blogs WHERE blogs.author_id = 5079;
+```
            id: 1
   select_type: SIMPLE
         table: blogs
@@ -54,8 +57,9 @@ possible_keys: blogs_thread_id_index
           ref: const
          rows: 1
         Extra: 
-
+```sql
 EXPLAIN SELECT * from blog_posts WHERE post_id = 20000;
+```
            id: 1
   select_type: SIMPLE
         table: blog_posts
@@ -73,11 +77,11 @@ possible_keys: blog_posts_id_index
 Среди запросов наиболее сложным является запрос на получение всех комментариев для 1 или нескольких пользователей в указанном блоге.
 
 
-sql
+```sql
  EXPLAIN SELECT c.text, c.created, c.author_id, c.post_id, c.comment_id FROM comments AS c
  JOIN posts  AS p ON c.post_id = p.id JOIN blog_posts AS b_p ON p.id = b_p.post_id 
  WHERE blog_id = 200 AND (c.author_id = 1996 OR c.author_id=1997) ORDER BY c.id;
-
+```
 
 Выполняя его с EXPLAIN, получаем:
            id: 1
