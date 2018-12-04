@@ -4,6 +4,7 @@
 ```sql
 EXPLAIN SELECT id FROM users WHERE username='ora994';
 ```
+Получаем:
            id: 1
   select_type: SIMPLE
         table: users
@@ -14,8 +15,10 @@ possible_keys: username,users_username_index
           ref: const
          rows: 1
         Extra: Using index
-
+```sql
 EXPLAIN SELECT * FROM sess WHERE user_id=5982;
+```
+Получаем:
             id: 1
   select_type: SIMPLE
         table: sess
@@ -28,8 +31,10 @@ possible_keys: sess_user_id_index
         Extra: 
         Extra: 
 Здесь оптимизировано с помощью индекса sess_user_id_index.
-
+```sql
 EXPLAIN SELECT id FROM users WHERE id = 1900;
+```
+Получаем:
            id: 1
   select_type: SIMPLE
         table: users
@@ -47,6 +52,7 @@ possible_keys: PRIMARY,id
 ```sql
 EXPLAIN SELECT id, title FROM blogs WHERE blogs.author_id = 5079;
 ```
+Получаем:
            id: 1
   select_type: SIMPLE
         table: blogs
@@ -60,6 +66,7 @@ possible_keys: blogs_thread_id_index
 ```sql
 EXPLAIN SELECT * from blog_posts WHERE post_id = 20000;
 ```
+Получаем:
            id: 1
   select_type: SIMPLE
         table: blog_posts
