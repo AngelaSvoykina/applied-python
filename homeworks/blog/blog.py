@@ -348,26 +348,37 @@ class Blog(object):
         Получения ветки комментариев начиная с заданного
         """
         select_comment_sql = "SELECT * from comments WHERE id={}".format(comment_id)
-        # select_post_comments_sql = "SELECT * from comments WHERE blog_id={}"
-        select_child_comment_sql = "SELECT id, text, created, comment_id, post_id FROM comments " \
-                                   "WHERE post_id={} AND comment_id={}"
+
+        select_post_comments_sql = "SELECT c.*, c_2.id AS child_id, c_2.text AS child_text," \
+                                   " c_2.created AS child_created, c_2.comment_id AS child_parent," \
+                                   " c_2.author_id AS child_author FROM comments AS c " \
+                                   "LEFT JOIN comments AS c_2 ON c.id = c_2.comment_id WHERE c.post_id={};"
 
         with self.connection.cursor() as cursor:
             cursor.execute(select_comment_sql)
             root_comment = cursor.fetchone()
+            post_id = root_comment['post_id']
 
-            comments = [{"id": root_comment['id'], "text": root_comment['text'],
-                         "created": root_comment['created'], "comment_id": root_comment['comment_id'],
-                         "post_id": root_comment['post_id']}]
-            parent_ids = [root_comment['id']]
+            cursor.execute(select_post_comments_sql.format(post_id))
 
-            while len(parent_ids) != 0:
-                parent_id = parent_ids[0]
-                cursor.execute(select_child_comment_sql.format(root_comment['post_id'], parent_id))
-                parent_ids.remove(parent_id)
-                childs = cursor.fetchall()
-                comments += childs
-                parent_ids += [x["id"] for x in childs]
+            post_comments = cursor.fetchall()
+
+        comments = [{"id": root_comment['id'], "text": root_comment['text'],
+                     "created": root_comment['created'], "comment_id": root_comment['comment_id'],
+                     "post_id": root_comment['post_id'], "author_id": root_comment["author_id"]}]
+        parent_ids = [root_comment['id']]
+
+        while len(parent_ids) != 0:
+            parent_id = parent_ids[0]
+
+            childs = [{"id": x['child_id'], "text": x['child_text'],
+                       "created": x['child_created'], "comment_id": x['child_parent'],
+                       "post_id": post_id, "author_id": x["child_author"]} for x in post_comments
+                      if x['id'] == parent_id and x['child_id'] is not None]
+            comments += childs
+
+            parent_ids.remove(parent_id)
+            parent_ids += [x["id"] for x in childs]
 
         self.connection.commit()
         return {"message": "OK", "data": comments}
@@ -401,8 +412,6 @@ class Blog(object):
 
 
 if __name__ == '__main__':
-    db = Blog()
-    db.connect()
-    res = db.get_thread_comments(10413)
-    print(res)
-
+    # db = Blog()
+    # db.connect()
+    pass
