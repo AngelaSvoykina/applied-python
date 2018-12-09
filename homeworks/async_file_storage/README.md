@@ -4,6 +4,23 @@
 Нужно написать демона с использованием `aiohttp`, который раздает файлы по HTTP из заранее назначенной директории
 (без вложенностей), а за отсутствующими файлами пробует обратиться к другим таким же демонам.
 
+Пример использования
+-----------
+
+Запустим 3 демона с тестовыми конфигами из папки configs/ :
+
+```python
+python async_file_storage.py -c 'configs/config_A.yml'
+```
+
+```python
+python async_file_storage.py -c 'configs/config_B.yml'
+```
+
+```python
+python async_file_storage.py -c 'configs/config_C.yml'
+```
+
 Общая схема
 -----------
 
