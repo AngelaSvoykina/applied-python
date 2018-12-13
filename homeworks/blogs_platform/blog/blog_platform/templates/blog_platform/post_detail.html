@@ -13,10 +13,14 @@
     <div class="comments">
             {% for comment in comments %}
 
-            <div class="date">
+            <div class="comment">
+               <div class="date">
                 {{ comment.created_date }}
             </div>
-        <h2>{{ comment.text }}</h2>
+        <div>{{ comment.text }}</div>
+            </div>
+
+
             {% endfor %}
 
     </div>
