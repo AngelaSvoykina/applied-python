@@ -1,27 +1,57 @@
 {% extends 'blog_platform/base.html' %}
 
 {% block content %}
-    <div class="post">
-        {% if post.published_date %}
-            <div class="date">
-                {{ post.published_date }}
-            </div>
-        {% endif %}
-        <h2>{{ post.title }}</h2>
-        <p>{{ post.text|linebreaksbr }}</p>
+<div class="post">
+    {% if post.published_date %}
+    <div class="date">
+        {{ post.published_date }}
     </div>
-    <div class="comments">
-            {% for comment in comments %}
+    {% endif %}
+    <h2>{{ post.title }}</h2>
+    <p>{{ post.text|linebreaksbr }}</p>
+</div>
 
-            <div class="comment">
-               <div class="date">
-                {{ comment.created_date }}
-            </div>
+<div class="comments">
+    {% for comment in comments %}
+    <div class="comments__item">
+        <div class="date">
+            {{ comment.created_date }}
+        </div>
         <div>{{ comment.text }}</div>
-            </div>
-
-
-            {% endfor %}
-
     </div>
+
+    {% endfor %}
+</div>
+
+<div class="pagination">
+    <span class="step-links">
+        {% if not comments|length %}
+            No comments yet.
+        {% else %}
+        {% if comments.has_previous %}
+            <a href="?page={{ comments.previous_page_number }}">previous</a>
+        {% endif %}
+
+
+        <span class="current">
+            Page {{ comments.number }} of {{ comments.paginator.num_pages }}.
+        </span>
+
+        {% if comments.has_next %}
+            <a href="?page={{ comments.next_page_number }}">next</a>
+        {% endif %}
+        {% endif %}
+
+    </span>
+</div>
+
+<div class="add-comment">
+    <h3>Add comment</h3>
+    <form method="POST" class="comment-form">{% csrf_token %}
+        <div class="add-comment__form">
+            {{ form }}
+        </div>
+        <button type="submit" class="save btn btn-default">Add</button>
+    </form>
+</div>
 {% endblock %}

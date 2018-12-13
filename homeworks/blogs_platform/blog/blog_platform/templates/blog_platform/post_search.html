@@ -1,8 +1,10 @@
-
 {% extends 'blog_platform/base.html' %}
 
 {% block content %}
-    <div class="filters"> <a href="?popular=1">Most Popular</a> / <a href="/">New First</a> </div>
+    <h2 class="search-title">Search for {{request.GET.search}}</h2>
+    {% if not posts|length %}
+        We didn't find anything.
+    {% endif %}
     {% for post in posts %}
         <div class="post">
             <div class="date">

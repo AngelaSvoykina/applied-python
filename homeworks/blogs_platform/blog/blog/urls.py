@@ -22,7 +22,3 @@ urlpatterns = [
     path('', include('blog_platform.urls'))
 ]
 
-
-
-
-
